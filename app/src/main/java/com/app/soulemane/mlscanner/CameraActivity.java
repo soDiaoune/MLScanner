@@ -1,5 +1,6 @@
 package com.app.soulemane.mlscanner;
 
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -19,10 +20,10 @@ import com.google.firebase.ml.vision.FirebaseVision;
 import com.google.firebase.ml.vision.common.FirebaseVisionImage;
 import com.google.firebase.ml.vision.text.FirebaseVisionText;
 import com.google.firebase.ml.vision.text.FirebaseVisionTextDetector;
-import com.wonderkiln.camerakit.CameraKit;
-import com.wonderkiln.camerakit.CameraKitEventCallback;
-import com.wonderkiln.camerakit.CameraKitImage;
-import com.wonderkiln.camerakit.CameraView;
+import com.otaliastudios.cameraview.CameraListener;
+import com.otaliastudios.cameraview.CameraUtils;
+import com.otaliastudios.cameraview.CameraView;
+
 
 import java.util.List;
 
@@ -41,8 +42,7 @@ public class CameraActivity extends AppCompatActivity {
     @BindView(R.id.capture)
     Button capture;
 
-    private int cameraMethod = CameraKit.Constants.METHOD_STANDARD;
-    private boolean cropOutput = false;
+
 
 
     @Override
@@ -50,66 +50,25 @@ public class CameraActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera);
         ButterKnife.bind(this);
-        cameraView.setMethod(cameraMethod);
-        cameraView.setCropOutput(cropOutput);
+
+        cameraView.addCameraListener(new CameraListener() {
+            @Override
+            public void onPictureTaken(byte[] jpeg) {
+                super.onPictureTaken(jpeg);
+                PreviewActivity.setImage(jpeg);
+                Intent myIntent = new Intent(CameraActivity.this, PreviewActivity.class);
+                startActivity(myIntent);
+                finish();
+            }
+        });
 
         capture.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                cameraView.captureImage(new CameraKitEventCallback<CameraKitImage>() {
-                    @Override
-                    public void callback(CameraKitImage cameraKitImage) {
+               cameraView.capturePicture();
 
-                        result = cameraKitImage.getBitmap();
-                        runTextRecognition(result);
-                    }
-                });
             }
         });
-    }
-    private void runTextRecognition(Bitmap capturedImage) {
-        FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(capturedImage);
-        FirebaseVisionTextDetector detector = FirebaseVision.getInstance()
-                .getVisionTextDetector();
-        capture.setEnabled(false);
-        detector.detectInImage(image)
-                .addOnSuccessListener(
-                        new OnSuccessListener<FirebaseVisionText>() {
-                            @Override
-                            public void onSuccess(FirebaseVisionText texts) {
-                                capture.setEnabled(true);
-                                processTextRecognitionResult(texts);
-                            }
-                        })
-                .addOnFailureListener(
-                        new OnFailureListener() {
-                            @Override
-                            public void onFailure(@NonNull Exception e) {
-                                // Task failed with an exception
-                                capture.setEnabled(true);
-                                e.printStackTrace();
-                            }
-                        });
-    }
-
-    private void processTextRecognitionResult(FirebaseVisionText texts) {
-        List<FirebaseVisionText.Block> blocks = texts.getBlocks();
-        if (blocks.size() == 0) {
-            Log.e("TT","No text found");
-            return;
-        }
-        for (int i = 0; i < blocks.size(); i++) {
-            List<FirebaseVisionText.Line> lines = blocks.get(i).getLines();
-            for (int j = 0; j < lines.size(); j++) {
-                List<FirebaseVisionText.Element> elements = lines.get(j).getElements();
-                for (int k = 0; k < elements.size(); k++) {
-                    String text = elements.get(k).getText();
-                    Log.e("TT",text);
-
-
-                }
-            }
-        }
     }
 
     @Override
@@ -120,10 +79,15 @@ public class CameraActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
-        cameraView.stop();
         super.onPause();
+        cameraView.stop();
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        cameraView.destroy();
+    }
 
 
 }
